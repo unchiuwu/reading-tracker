@@ -1,0 +1,8 @@
+#virtual environment
+sheets/
+
+#google sheets api credentials
+credentials.json
+
+#environment variables
+.env
