@@ -27,18 +27,40 @@ st.markdown(
         background-color: #f8f9fa;
     }
 
-    .metric-card {
-        background-color: white;
-        padding: 20px;
+    [data-testid="stMetric"] {
+        background-color: #3089FE;
+        padding: 14px 16px;
         border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e9ecef;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 0.85rem;
+    }
+
+    [data-testid="stMetricValue"] {
+        font-size: 1.6rem;
+        font-weight: 700;
+    }
+
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    h1 {
+        font-size: 2.2rem;
+    }
+
+    h2 {
+        margin-top: 1rem;
     }
 
     </style>
     """,
     unsafe_allow_html=True
 )
-
 
 # LOAD DATA
 
@@ -117,24 +139,24 @@ st.divider()
 
 # KPI SECTION
 
+# KPI SECTION
+
 total_books = len(filtered_df)
 
 total_read = filtered_df["Status"].eq("Read").sum()
 
+total_reading = filtered_df["Status"].eq("Reading").sum()
+
 total_tbr = filtered_df["Status"].eq("To Be Read").sum()
 
-unknown_year = (
-    filtered_df["Status"].eq("Read")
-    & filtered_df["Finish_Year"].isna()
-).sum()
-
-known_year = (
-    filtered_df["Status"].eq("Read")
-    & filtered_df["Finish_Year"].notna()
-).sum()
+completion_rate = (
+    total_read / total_books * 100
+    if total_books > 0
+    else 0
+)
 
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 col1.metric(
     "Total Books",
@@ -147,483 +169,505 @@ col2.metric(
 )
 
 col3.metric(
+    "Currently Reading",
+    f"{total_reading:,}"
+)
+
+col4.metric(
     "To Be Read",
     f"{total_tbr:,}"
 )
 
-col4.metric(
-    "Unknown Completion Year",
-    f"{unknown_year:,}"
+col5.metric(
+    "Completion Rate",
+    f"{completion_rate:.1f}%"
 )
-
 
 st.divider()
 
+tab_overview, tab_trends, tab_analysis, tab_explorer = st.tabs([
+    "📊 Overview",
+    "📈 Reading Trends",
+    "📚 Book Analysis",
+    "🔎 Book Explorer"
+])
 
-# SECTION 1  READING STATUS
+with tab_overview:
+    # st.header("Reading Overview")
+    col1, col2 = st.columns(2)
 
-st.header("Reading Status")
+    with col1:
 
-status_counts = (
-    filtered_df["Status"]
-    .value_counts()
-    .reindex(status_options, fill_value=0)
-    .reset_index()
-)
+        status_counts = (
+            filtered_df["Status"]
+            .value_counts()
+            .reindex(status_options, fill_value=0)
+            .reset_index()
+        )
 
-status_counts.columns = [
-    "Status",
-    "Books"
-]
+        status_counts.columns = [
+            "Status",
+            "Books"
+        ]
 
-fig_status = px.bar(
-    status_counts,
-    x="Status",
-    y="Books",
-    color="Status",
-    text="Books",
-    title="Reading Status Distribution"
-)
+        fig_status = px.bar(
+            status_counts,
+            x="Status",
+            y="Books",
+            color="Status",
+            text="Books",
+            title="Reading Status"
+        )
 
-fig_status.update_layout(
-    showlegend=False
-)
+        fig_status.update_layout(
+            showlegend=False,
+            height=350
+        )
 
-st.plotly_chart(
-    fig_status,
-    use_container_width=True
-)
+        st.plotly_chart(
+            fig_status,
+            use_container_width=True
+        )
 
+    with col2:
 
-# SECTION 2  LANGUAGE
+        language_counts = (
+            filtered_df["Language"]
+            .value_counts()
+            .reset_index()
+        )
 
-st.header("Language Analysis")
+        language_counts.columns = [
+            "Language",
+            "Books"
+        ]
 
-col1, col2 = st.columns(2)
+        fig_language = px.pie(
+            language_counts,
+            names="Language",
+            values="Books",
+            hole=0.45,
+            title="Language Distribution"
+        )
 
+        fig_language.update_layout(
+            height=350
+        )
 
-with col1:
+        st.plotly_chart(
+            fig_language,
+            use_container_width=True
+        )
+    st.subheader("📖 Currently Reading")
 
-    language_counts = (
-        filtered_df["Language"]
-        .value_counts()
-        .reset_index()
-    )
-
-    language_counts.columns = [
-        "Language",
-        "Books"
+    currently_reading = filtered_df[
+        filtered_df["Status"].eq("Reading")
     ]
 
-    fig_language = px.pie(
-        language_counts,
-        names="Language",
-        values="Books",
-        hole=0.4,
-        title="Language Distribution"
-    )
+    if currently_reading.empty:
 
-    st.plotly_chart(
-        fig_language,
-        use_container_width=True
-    )
+        st.info(
+            "You're not currently reading any books."
+        )
+
+    else:
+
+        display_columns = [
+            "Title",
+            "Author",
+            "Language",
+            "Start_Month"
+        ]
+
+        st.dataframe(
+            currently_reading[display_columns],
+            use_container_width=True,
+            hide_index=True
+        )
+        st.subheader("💡 Reading Insights")
+
+    insight_col1, insight_col2, insight_col3 = st.columns(3)
+
+    if not filtered_df.empty:
+
+        most_common_language = (
+            filtered_df["Language"]
+            .value_counts()
+            .idxmax()
+        )
+
+        most_common_status = (
+            filtered_df["Status"]
+            .value_counts()
+            .idxmax()
+        )
+
+        insight_col1.metric(
+            "Most Common Language",
+            most_common_language
+        )
+
+        insight_col2.metric(
+            "Most Common Status",
+            most_common_status
+        )
+
+        insight_col3.metric(
+            "Books in TBR",
+            f"{total_tbr:,}"
+        )
 
 
-with col2:
+with tab_trends:
 
+    # st.header("📈 Reading Trends")
     read_df = filtered_df[
         filtered_df["Status"].eq("Read")
+    ].copy()
+
+
+    # Known completion years
+
+    annual_data = (
+        read_df[
+            read_df["Reading_Year"] > 0
+        ]
+        .groupby(
+            "Reading_Year"
+        )
+        .size()
+        .reset_index(
+            name="Books_Read"
+        )
+    )
+
+    annual_data["Reading_Year"] = (
+        annual_data["Reading_Year"]
+        .astype(int)
+    )
+
+    annual_data = annual_data.sort_values(
+        "Reading_Year"
+    )
+
+    st.header("Monthly Reading Patterns")
+
+    monthly_read_df = read_df[
+        read_df["Finish_Month"].notna()
+    ].copy()
+
+
+    start_month_df = read_df[
+        read_df["Start_Month"].notna()
+    ].copy()
+
+
+    month_names = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
     ]
 
-    read_language = (
-        read_df["Language"]
+
+    # Monthly completion counts
+
+    completion_counts = (
+        monthly_read_df["Finish_Month"]
         .value_counts()
-        .reset_index()
+        .reindex(
+            range(1, 13),
+            fill_value=0
+        )
     )
 
-    read_language.columns = [
-        "Language",
-        "Books_Read"
-    ]
 
-    fig_read_language = px.bar(
-        read_language,
-        x="Language",
-        y="Books_Read",
-        color="Language",
-        text="Books_Read",
-        title="Completed Books by Language"
+    # Monthly start counts
+
+    start_counts = (
+        start_month_df["Start_Month"]
+        .value_counts()
+        .reindex(
+            range(1, 13),
+            fill_value=0
+        )
     )
 
-    fig_read_language.update_layout(
-        showlegend=False
+
+    monthly_comparison = pd.DataFrame({
+        "Month": month_names,
+        "Books Started": start_counts.values,
+        "Books Completed": completion_counts.values
+    })
+
+
+    monthly_plot = monthly_comparison.melt(
+        id_vars="Month",
+        var_name="Reading Event",
+        value_name="Books"
+    )
+
+
+    fig_monthly = px.bar(
+        monthly_plot,
+        x="Month",
+        y="Books",
+        color="Reading Event",
+        barmode="group",
+        title="Books Started vs Completed by Month"
+    )
+
+    fig_monthly.update_layout(
+        height=400,
+        xaxis_tickangle=-45
     )
 
     st.plotly_chart(
-        fig_read_language,
+        fig_monthly,
+        use_container_width=True
+    )
+
+    st.subheader("Annual Reading Volume by Language")
+
+    annual_language = (
+        read_df
+        .groupby(
+            ["Reading_Year", "Language"]
+        )
+        .size()
+        .reset_index(
+            name="Books_Read"
+        )
+    )
+
+    annual_language["Year_Label"] = (
+        annual_language["Reading_Year"]
+        .apply(
+            lambda x:
+            "????"
+            if x == 0
+            else str(int(x))
+        )
+    )
+
+    annual_language["Sort_Order"] = (
+        annual_language["Reading_Year"]
+        .replace(0, np.inf)
+    )
+
+    annual_language = (
+        annual_language
+        .sort_values("Sort_Order")
+    )
+
+
+    fig_annual_language = px.bar(
+        annual_language,
+        x="Year_Label",
+        y="Books_Read",
+        color="Language",
+        barmode="group",
+        text="Books_Read",
+        title="Completed Books by Year and Language"
+    )
+
+    fig_annual_language.update_layout(
+        xaxis_title="Completion Year",
+        yaxis_title="Books Read"
+    )
+
+    st.plotly_chart(
+        fig_annual_language,
+        use_container_width=True
+    )
+
+    st.subheader(
+        "Start Month vs Completion Month"
+    )
+
+    start_finish_df = read_df[
+        read_df["Start_Month"].notna()
+        & read_df["Finish_Month"].notna()
+    ].copy()
+
+
+    start_finish_matrix = pd.crosstab(
+        start_finish_df["Start_Month"],
+        start_finish_df["Finish_Month"]
+    )
+
+
+    start_finish_matrix = (
+        start_finish_matrix
+        .reindex(
+            index=range(1, 13),
+            fill_value=0
+        )
+        .reindex(
+            columns=range(1, 13),
+            fill_value=0
+        )
+    )
+
+
+    start_finish_matrix.index = month_names
+    start_finish_matrix.columns = month_names
+
+
+    fig_heatmap = px.imshow(
+        start_finish_matrix,
+        text_auto=True,
+        color_continuous_scale="Blues",
+        labels={
+            "x": "Completion Month",
+            "y": "Start Month",
+            "color": "Books"
+        },
+        title="Book Starts vs Completion Months"
+    )
+
+    st.plotly_chart(
+        fig_heatmap,
+        use_container_width=True
+    )
+
+with tab_analysis:
+
+    st.header("📚 Book Analysis")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        type_counts = (
+            filtered_df["Type"]
+            .value_counts()
+            .reset_index()
+        )
+
+        type_counts.columns = [
+            "Type",
+            "Books"
+        ]
+
+        fig_types = px.bar(
+            type_counts,
+            x="Type",
+            y="Books",
+            color="Type",
+            text="Books",
+            title="Book Type"
+        )
+
+        fig_types.update_layout(
+            showlegend=False,
+            height=400
+        )
+
+        st.plotly_chart(
+            fig_types,
+            use_container_width=True
+        )
+    with col2:
+        publication_df = filtered_df[
+            filtered_df["Publish_Year"].notna()
+        ].copy()
+
+        fig_publication = px.histogram(
+            publication_df,
+            x="Publish_Year",
+            nbins=30,
+            title="Publication Years"
+        )
+
+        fig_publication.update_layout(
+            height=400,
+            xaxis_title="Publication Year",
+            yaxis_title="Number of Books"
+        )
+
+        st.plotly_chart(
+            fig_publication,
+            use_container_width=True
+        )
+    fig_annual = px.line(
+        annual_data,
+        x="Reading_Year",
+        y="Books_Read",
+        markers=True,
+        title="Books Completed by Year"
+    )
+
+    fig_annual.update_layout(
+        height=400,
+        xaxis_title="Completion Year",
+        yaxis_title="Books Read"
+    )
+
+    st.plotly_chart(
+        fig_annual,
         use_container_width=True
     )
 
 
-# SECTION 3  BOOK TYPES
+with tab_explorer:
 
-st.header("Book Type Analysis")
-
-type_counts = (
-    filtered_df["Type"]
-    .value_counts()
-    .reset_index()
+    st.header("Book Explorer")
+    search = st.text_input(
+    "Search by title or author",
+    placeholder="e.g. Dune, Tolkien, Murakami..."
 )
 
-type_counts.columns = [
-    "Type",
-    "Books"
-]
+    book_view = filtered_df.copy()
 
-fig_types = px.bar(
-    type_counts,
-    x="Type",
-    y="Books",
-    color="Type",
-    text="Books",
-    title="Book Type Distribution"
-)
+    if search:
 
-fig_types.update_layout(
-    showlegend=False
-)
+        mask = (
+            book_view["Title"]
+            .fillna("")
+            .str.contains(
+                search,
+                case=False,
+                na=False
+            )
+            |
+            book_view["Author"]
+            .fillna("")
+            .str.contains(
+                search,
+                case=False,
+                na=False
+            )
+        )
 
-st.plotly_chart(
-    fig_types,
-    use_container_width=True
-)
+        book_view = book_view[mask]
 
+    st.caption(
+        f"Showing {len(book_view):,} books"
+    )
 
-# SECTION 4  ANNUAL READING
-
-st.header("Reading Trends Over Time")
-
-read_df = filtered_df[
-    filtered_df["Status"].eq("Read")
-].copy()
-
-
-# Known completion years
-
-annual_data = (
-    read_df[
-        read_df["Reading_Year"] > 0
+    display_columns = [
+        "BookID",
+        "Title",
+        "Author",
+        "Language",
+        "Status",
+        "Reading_Year",
+        "Publish_Year",
+        "Publisher"
     ]
-    .groupby(
-        "Reading_Year"
+
+    st.dataframe(
+        book_view[display_columns],
+        use_container_width=True,
+        hide_index=True
     )
-    .size()
-    .reset_index(
-        name="Books_Read"
-    )
-)
-
-annual_data["Reading_Year"] = (
-    annual_data["Reading_Year"]
-    .astype(int)
-)
-
-annual_data = annual_data.sort_values(
-    "Reading_Year"
-)
-
-
-fig_annual = px.line(
-    annual_data,
-    x="Reading_Year",
-    y="Books_Read",
-    markers=True,
-    title="Books Completed by Year"
-)
-
-fig_annual.update_layout(
-    xaxis_title="Completion Year",
-    yaxis_title="Books Read"
-)
-
-st.plotly_chart(
-    fig_annual,
-    use_container_width=True
-)
-
-
-# SECTION 5  YEAR × LANGUAGE
-
-st.subheader("Annual Reading Volume by Language")
-
-annual_language = (
-    read_df
-    .groupby(
-        ["Reading_Year", "Language"]
-    )
-    .size()
-    .reset_index(
-        name="Books_Read"
-    )
-)
-
-annual_language["Year_Label"] = (
-    annual_language["Reading_Year"]
-    .apply(
-        lambda x:
-        "????"
-        if x == 0
-        else str(int(x))
-    )
-)
-
-annual_language["Sort_Order"] = (
-    annual_language["Reading_Year"]
-    .replace(0, np.inf)
-)
-
-annual_language = (
-    annual_language
-    .sort_values("Sort_Order")
-)
-
-
-fig_annual_language = px.bar(
-    annual_language,
-    x="Year_Label",
-    y="Books_Read",
-    color="Language",
-    barmode="group",
-    text="Books_Read",
-    title="Completed Books by Year and Language"
-)
-
-fig_annual_language.update_layout(
-    xaxis_title="Completion Year",
-    yaxis_title="Books Read"
-)
-
-st.plotly_chart(
-    fig_annual_language,
-    use_container_width=True
-)
-
-
-# SECTION 6  MONTHLY ANALYSIS
-
-st.header("Monthly Reading Patterns")
-
-monthly_read_df = read_df[
-    read_df["Finish_Month"].notna()
-].copy()
-
-
-start_month_df = read_df[
-    read_df["Start_Month"].notna()
-].copy()
-
-
-month_names = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December"
-]
-
-
-# Monthly completion counts
-
-completion_counts = (
-    monthly_read_df["Finish_Month"]
-    .value_counts()
-    .reindex(
-        range(1, 13),
-        fill_value=0
-    )
-)
-
-
-# Monthly start counts
-
-start_counts = (
-    start_month_df["Start_Month"]
-    .value_counts()
-    .reindex(
-        range(1, 13),
-        fill_value=0
-    )
-)
-
-
-monthly_comparison = pd.DataFrame({
-    "Month": month_names,
-    "Books Started": start_counts.values,
-    "Books Completed": completion_counts.values
-})
-
-
-monthly_plot = monthly_comparison.melt(
-    id_vars="Month",
-    var_name="Reading Event",
-    value_name="Books"
-)
-
-
-fig_monthly = px.bar(
-    monthly_plot,
-    x="Month",
-    y="Books",
-    color="Reading Event",
-    barmode="group",
-    title="Books Started vs Completed by Month"
-)
-
-fig_monthly.update_layout(
-    xaxis_tickangle=-45
-)
-
-st.plotly_chart(
-    fig_monthly,
-    use_container_width=True
-)
-
-
-# SECTION 7  START × COMPLETION MONTH
-
-st.subheader(
-    "Start Month vs Completion Month"
-)
-
-start_finish_df = read_df[
-    read_df["Start_Month"].notna()
-    & read_df["Finish_Month"].notna()
-].copy()
-
-
-start_finish_matrix = pd.crosstab(
-    start_finish_df["Start_Month"],
-    start_finish_df["Finish_Month"]
-)
-
-
-start_finish_matrix = (
-    start_finish_matrix
-    .reindex(
-        index=range(1, 13),
-        fill_value=0
-    )
-    .reindex(
-        columns=range(1, 13),
-        fill_value=0
-    )
-)
-
-
-start_finish_matrix.index = month_names
-start_finish_matrix.columns = month_names
-
-
-fig_heatmap = px.imshow(
-    start_finish_matrix,
-    text_auto=True,
-    color_continuous_scale="Blues",
-    labels={
-        "x": "Completion Month",
-        "y": "Start Month",
-        "color": "Books"
-    },
-    title="Book Starts vs Completion Months"
-)
-
-st.plotly_chart(
-    fig_heatmap,
-    use_container_width=True
-)
-
-
-# SECTION 8  PUBLICATION YEAR
-
-st.header("Publication Analysis")
-
-publication_df = filtered_df[
-    filtered_df["Publish_Year"].notna()
-].copy()
-
-
-fig_publication = px.histogram(
-    publication_df,
-    x="Publish_Year",
-    nbins=30,
-    title="Distribution of Publication Years"
-)
-
-fig_publication.update_layout(
-    xaxis_title="Publication Year",
-    yaxis_title="Number of Books"
-)
-
-st.plotly_chart(
-    fig_publication,
-    use_container_width=True
-)
-
-# BOOK EXPLORER
-
-st.header("📖 Book Explorer")
-
-search = st.text_input(
-    "Search by title or author"
-)
-
-book_view = filtered_df.copy()
-
-if search:
-
-    mask = (
-        book_view["Title"]
-        .fillna("")
-        .str.contains(
-            search,
-            case=False,
-            na=False
-        )
-        |
-        book_view["Author"]
-        .fillna("")
-        .str.contains(
-            search,
-            case=False,
-            na=False
-        )
-    )
-
-    book_view = book_view[mask]
-
-
-display_columns = [
-    "BookID",
-    "Title",
-    "Author",
-    "Language",
-    "Status",
-    "Reading_Year",
-    "Publish_Year",
-    "Publisher"
-]
-
-st.dataframe(
-    book_view[display_columns],
-    use_container_width=True,
-    hide_index=True
-)
 
 # FOOTER
 
