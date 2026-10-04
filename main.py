@@ -68,12 +68,12 @@ st.sidebar.divider()
 
 # FILTERS
 
-status_options = sorted(
-    df["Status"]
-    .dropna()
-    .unique()
-    .tolist()
-)
+status_options = [
+    "Reading",
+    "To Be Read",
+    "Dropped",
+    "Read"
+]
 
 language_options = sorted(
     df["Language"]
@@ -167,6 +167,7 @@ st.header("Reading Status")
 status_counts = (
     filtered_df["Status"]
     .value_counts()
+    .reindex(status_options, fill_value=0)
     .reset_index()
 )
 
